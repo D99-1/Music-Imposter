@@ -1,0 +1,231 @@
+import React, { useState, useEffect } from 'react';
+import { Music, AlertCircle, Play, ChevronRight, Vote, CheckCircle2, XCircle, Skull, Music2 } from 'lucide-react';
+import SongSearch from './SongSearch';
+import AudioPreview from './AudioPreview';
+
+export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
+  const me = gameState.players.find(p => p.id === peerId);
+  const isEliminated = me?.eliminated;
+
+  if (gameState.status === 'REVEAL') {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-12 animate-in fade-in duration-1000 text-center max-w-lg w-full">
+        <div className="space-y-4">
+          <h2 className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em]">Identity Transmission</h2>
+          <div className={`text-8xl font-black tracking-tighter leading-none ${me?.isImposter ? 'text-red-500' : 'text-accent'}`}>
+            {me?.isImposter ? 'IMPOSTER' : 'CREW'}
+          </div>
+        </div>
+
+        <div className="w-full bg-secondary/5 p-10 rounded-[40px] border border-secondary/10 relative overflow-hidden group">
+          <div className={`absolute top-0 left-0 w-full h-1 ${me?.isImposter ? 'bg-red-500' : 'bg-accent'} opacity-50`}></div>
+          {me?.isImposter
+            ? <div className="space-y-4">
+                <Skull className="mx-auto text-red-500/50" size={48} />
+                <p className="text-xl font-bold tracking-tight opacity-80">You don't know the word. Try to blend in with your frequency!</p>
+              </div>
+            : <div className="space-y-2">
+                <p className="text-[10px] opacity-30 uppercase font-black tracking-[0.2em] mb-4">Target Frequency</p>
+                <p className="text-6xl font-black text-highlight tracking-tighter uppercase">{gameState.currentWord}</p>
+              </div>
+          }
+        </div>
+
+        <div className="w-full">
+          {isHost ? (
+            <button
+              onClick={() => sendAction({ type: 'START_SEARCH' })}
+              className="w-full px-10 py-6 bg-secondary text-primary font-black rounded-3xl text-xl shadow-2xl hover:bg-white transition-all transform active:scale-95"
+            >
+              COMMENCE SEARCH
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-center gap-1">
+                {[0, 1, 2].map(i => <div key={i} className="w-1.5 h-1.5 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)}
+              </div>
+              <p className="text-[10px] font-black opacity-20 uppercase tracking-[0.4em]">Waiting for Host Authorization</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (gameState.status === 'SEARCH') {
+    if (isEliminated) return <div className="text-3xl font-black opacity-10 uppercase tracking-widest animate-pulse flex flex-col items-center gap-6"><Skull size={64}/> Spectating...</div>;
+    if (me?.isReady) return (
+      <div className="flex flex-col items-center space-y-8 animate-in zoom-in duration-500">
+        <div className="w-32 h-32 bg-accent/10 rounded-[40px] border border-accent/20 flex items-center justify-center text-accent shadow-2xl shadow-accent/20">
+           <CheckCircle2 size={64} strokeWidth={2.5} />
+        </div>
+        <div className="text-center space-y-2">
+           <div className="text-3xl font-black tracking-tighter uppercase">Signal Locked</div>
+           <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.3em]">Waiting for other frequencies</p>
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="flex flex-col items-center w-full space-y-12 animate-in slide-in-from-bottom-12 duration-700">
+        <div className="text-center space-y-2">
+           <h2 className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em] mb-4">Transmission Phase</h2>
+           {!me?.isImposter && <p className="text-highlight font-black text-6xl tracking-tighter uppercase">{gameState.currentWord}</p>}
+           {me?.isImposter && <p className="text-red-500 font-black text-6xl tracking-tighter uppercase">Imposter</p>}
+        </div>
+        <SongSearch onSelect={(song) => sendAction({ type: 'SUBMIT_SONG', song })} />
+      </div>
+    );
+  }
+
+  if (gameState.status === 'PLAYBACK') {
+    const playersWithSongs = gameState.players.filter(p => !p.eliminated && p.song);
+    const currentPlayer = playersWithSongs[gameState.currentPlayingPlayerIndex];
+
+    return (
+      <div className="flex flex-col items-center space-y-12 w-full max-w-xl animate-in fade-in duration-700">
+        <div className="text-center space-y-4">
+           <div className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em]">Deciphering Signal</div>
+           <div className="text-7xl font-black text-highlight tracking-tighter leading-none">{currentPlayer?.name}</div>
+        </div>
+
+        <div className="w-full bg-secondary/5 aspect-square max-w-md rounded-[60px] border border-secondary/10 flex items-center justify-center relative overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)]">
+          <img src={currentPlayer?.song?.artwork} className="absolute inset-0 w-full h-full object-cover opacity-10 blur-3xl scale-150" alt="" />
+          <div className="relative z-10 p-10 flex flex-col items-center text-center w-full space-y-10">
+            <div className="relative group">
+               <img src={currentPlayer?.song?.artwork} className="w-64 h-64 rounded-[40px] shadow-2xl border border-white/5 group-hover:scale-105 transition-transform duration-700" alt="" />
+               <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-highlight rounded-2xl flex items-center justify-center text-white shadow-xl">
+                  <Music2 size={32} />
+               </div>
+            </div>
+
+            <div className="w-full">
+              {isHost ? (
+                <AudioPreview song={currentPlayer.song} startTime={currentPlayer.song.startTime} isEditable={false} />
+              ) : (
+                <div className="p-8 bg-white/5 backdrop-blur-2xl rounded-[32px] border border-white/10 space-y-1">
+                  <h4 className="font-black text-2xl tracking-tight leading-tight truncate">{currentPlayer?.song?.title}</h4>
+                  <p className="text-[10px] font-black opacity-30 uppercase tracking-widest truncate">{currentPlayer?.song?.artist}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full max-w-md">
+          {isHost ? (
+            <button
+              onClick={() => sendAction({ type: 'NEXT_SONG' })}
+              className="group w-full flex items-center justify-center gap-4 py-8 bg-secondary text-primary font-black rounded-[32px] text-2xl shadow-2xl hover:bg-white transition-all transform active:scale-95"
+            >
+              {gameState.currentPlayingPlayerIndex === playersWithSongs.length - 1 ? 'INITIATE VOTING' : 'NEXT SIGNAL'}
+              <ChevronRight size={32} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          ) : (
+             <div className="flex flex-col items-center gap-4">
+                <div className="flex justify-center gap-1">
+                  {[0, 1, 2].map(i => <div key={i} className="w-2 h-2 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)}
+                </div>
+                <p className="text-[10px] font-black opacity-20 uppercase tracking-[0.4em]">Audio Analysis in Progress</p>
+             </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (gameState.status === 'VOTING') {
+    const votingPlayers = gameState.players.filter(p => !p.eliminated);
+
+    if (isEliminated || me?.isReady) {
+      return (
+        <div className="flex flex-col items-center space-y-12 animate-in fade-in duration-500">
+           <div className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em]">Awaiting Deliberation</div>
+           <div className="flex flex-wrap justify-center gap-8">
+              {gameState.players.filter(p => !p.eliminated).map(p => (
+                 <div key={p.id} className="flex flex-col items-center gap-4">
+                    <div className={`w-16 h-16 rounded-[24px] border-2 flex items-center justify-center transition-all duration-700 ${p.isReady ? 'bg-accent/10 border-accent text-accent shadow-[0_0_30px_rgba(0,255,65,0.2)]' : 'bg-secondary/5 border-secondary/10 opacity-30'}`}>
+                       {p.isReady ? <CheckCircle2 size={32} /> : <div className="text-xl font-black">{p.name[0]}</div>}
+                    </div>
+                    <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">{p.name}</span>
+                 </div>
+              ))}
+           </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center w-full space-y-12 animate-in slide-in-from-bottom-12 duration-700">
+        <div className="text-center space-y-2">
+           <h2 className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em] mb-4">Interrogation Phase</h2>
+           <p className="text-red-500 font-black text-6xl tracking-tighter uppercase">Identify Imposter</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+          {votingPlayers.filter(p => p.id !== peerId).map(p => (
+            <button
+              key={p.id}
+              onClick={() => sendAction({ type: 'VOTE', targetId: p.id })}
+              className="group flex items-center gap-6 p-8 bg-secondary/5 border border-secondary/10 rounded-[40px] hover:border-red-500/50 hover:bg-red-500/5 transition-all text-left relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-100 transition-opacity">
+                 <Skull size={64} className="text-red-500" />
+              </div>
+              <div className="w-20 h-20 bg-secondary/10 rounded-[28px] flex items-center justify-center font-black text-3xl group-hover:bg-red-500 group-hover:text-white transition-all transform group-hover:scale-110 group-hover:-rotate-3">
+                 {p.name[0]}
+              </div>
+              <div className="flex-1 min-w-0 z-10">
+                <div className="font-black text-4xl tracking-tight leading-none mb-1">{p.name}</div>
+                <div className="text-[10px] font-black opacity-20 uppercase tracking-widest truncate">SIGNAL: {p.song?.title}</div>
+              </div>
+              <Vote className="opacity-0 group-hover:opacity-100 text-red-500 transition-opacity z-10" size={32} />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (gameState.status === 'RESULTS') {
+     const { lastEliminated } = gameState;
+     return (
+       <div className="flex flex-col items-center space-y-12 animate-in zoom-in duration-700 text-center max-w-2xl">
+         <h2 className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em]">The Final Verdict</h2>
+
+         <div className="space-y-8 bg-secondary/5 p-16 rounded-[60px] border border-secondary/10 w-full relative">
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-20 h-20 bg-primary border border-secondary/10 rounded-[32px] flex items-center justify-center">
+               <Skull size={40} className={lastEliminated?.isImposter ? "text-accent" : "text-red-500"} />
+            </div>
+            <div className="space-y-4">
+              <div className="text-5xl font-black tracking-tighter opacity-40">
+                {lastEliminated?.name} <span className="text-xl italic lowercase">was</span>
+              </div>
+              <div className={`text-8xl font-black tracking-tighter leading-none ${lastEliminated?.isImposter ? 'text-accent' : 'text-red-500'}`}>
+                {lastEliminated?.isImposter ? 'IMPOSTER' : 'INNOCENT'}
+              </div>
+            </div>
+         </div>
+
+         <div className="w-full">
+            {isHost ? (
+              <button
+                onClick={() => sendAction({ type: 'NEXT_ROUND' })}
+                className="w-full px-12 py-8 bg-highlight text-white font-black rounded-[32px] text-2xl shadow-2xl shadow-highlight/40 hover:brightness-110 transition-all transform active:scale-95"
+              >
+                PROCEED TO NEXT CYCLE
+              </button>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex justify-center gap-1">
+                  {[0, 1, 2].map(i => <div key={i} className="w-2 h-2 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)}
+                </div>
+                <p className="text-[10px] font-black opacity-20 uppercase tracking-[0.4em]">Awaiting Host Progression</p>
+              </div>
+            )}
+         </div>
+       </div>
+     );
+  }
+
+  return null;
+}
