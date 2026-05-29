@@ -5,6 +5,13 @@ export default function RoomJoin({ onCreate, onJoin }) {
   const [roomCode, setRoomCode] = useState('');
   const [name, setName] = useState('');
 
+  const handleJoin = (e) => {
+    e.preventDefault();
+    if (name && roomCode.length === 6) {
+      onJoin(roomCode, name);
+    }
+  };
+
   return (
     <div className="w-full max-w-sm space-y-8 md:space-y-12 animate-in slide-in-from-bottom-8 duration-700 px-4">
       <div className="space-y-4 text-center">
@@ -24,8 +31,8 @@ export default function RoomJoin({ onCreate, onJoin }) {
             type="text"
             placeholder="NICKNAME"
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full bg-secondary/5 border border-secondary/10 rounded-2xl py-4 px-6 focus:outline-none focus:border-highlight/50 transition-all text-lg font-bold placeholder:opacity-20"
+            onChange={(e) => setName(e.target.value.toUpperCase())}
+            className="w-full bg-secondary/5 border border-secondary/10 rounded-2xl py-4 px-6 focus:outline-none focus:border-highlight/50 transition-all text-lg font-bold placeholder:opacity-20 uppercase"
           />
         </div>
 
@@ -40,26 +47,29 @@ export default function RoomJoin({ onCreate, onJoin }) {
 
           <div className="relative py-2 flex items-center gap-4">
             <div className="h-px bg-secondary/10 flex-1"></div>
-            <div className="text-[10px] uppercase font-black opacity-20 tracking-widest">or</div>
+            <div className="text-[10px] uppercase font-black opacity-20 tracking-widest">or join</div>
             <div className="h-px bg-secondary/10 flex-1"></div>
           </div>
 
-          <div className="space-y-4">
+          <form onSubmit={handleJoin} className="space-y-4">
             <input
               type="text"
-              placeholder="ROOM CODE"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="6-DIGIT CODE"
               value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-              className="w-full bg-secondary/5 border border-secondary/10 rounded-2xl py-4 px-6 focus:outline-none focus:border-highlight/50 transition-all text-lg text-center tracking-[0.2em] font-mono placeholder:opacity-10"
+              onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))}
+              className="w-full bg-secondary/5 border border-secondary/10 rounded-2xl py-4 px-6 focus:outline-none focus:border-highlight/50 transition-all text-2xl text-center tracking-[0.5em] font-mono placeholder:opacity-10 placeholder:text-sm placeholder:tracking-widest"
             />
             <button
-              onClick={() => onJoin(roomCode, name)}
-              disabled={!name || roomCode.length < 4}
+              type="submit"
+              disabled={!name || roomCode.length < 6}
               className="flex items-center justify-center gap-3 w-full bg-highlight text-white font-black py-4 md:py-5 rounded-2xl hover:brightness-110 transition-all disabled:opacity-30 transform active:scale-95 shadow-lg shadow-highlight/20"
             >
               <LogIn size={20} strokeWidth={3} /> JOIN SESSION
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

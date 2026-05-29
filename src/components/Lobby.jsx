@@ -41,10 +41,14 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings }) 
             </div>
             <button
               onClick={copyCode}
-              className="flex items-center gap-2 text-[10px] font-black bg-secondary/10 hover:bg-secondary/20 px-3 md:px-4 py-2 rounded-xl transition-all active:scale-95"
+              className="group relative flex flex-col items-center bg-secondary/10 hover:bg-secondary/20 px-6 py-3 rounded-2xl transition-all active:scale-95 border border-white/5"
             >
-              {copied ? <Check size={14} className="text-accent" /> : <Copy size={14} />}
-              {copied ? 'COPIED' : 'COPY'}
+              <span className="text-[8px] font-black opacity-30 uppercase tracking-widest mb-1">Room Code</span>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-black tracking-[0.2em] font-mono text-highlight">{gameState.roomId}</span>
+                {copied ? <Check size={16} className="text-accent" /> : <Copy size={16} className="opacity-30 group-hover:opacity-100 transition-opacity" />}
+              </div>
+              {copied && <span className="absolute -top-8 bg-accent text-primary text-[8px] font-black px-2 py-1 rounded">COPIED</span>}
             </button>
           </div>
 

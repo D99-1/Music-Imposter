@@ -19,6 +19,10 @@ const INITIAL_STATE = {
   lastEliminated: null,
 };
 
+const generateRoomCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
 export function useGamePeer() {
   const [peer, setPeer] = useState(null);
   const [gameState, setGameState] = useState(INITIAL_STATE);
@@ -26,25 +30,14 @@ export function useGamePeer() {
   const [error, setError] = useState(null);
   const connections = useRef({});
   const stateRef = useRef(INITIAL_STATE);
+  const currentPeerId = useRef(null);
 
   useEffect(() => {
     stateRef.current = gameState;
   }, [gameState]);
 
-  useEffect(() => {
-    const newPeer = new Peer();
-    newPeer.on('open', (id) => {
-      setPeer(newPeer);
-    });
-    newPeer.on('error', (err) => {
-      console.error(err);
-      setError(err.type === 'peer-unavailable' ? 'Room not found' : err.message);
-    });
-
-    return () => {
-      newPeer.destroy();
-    };
-  }, []);
+  // Peer initialization is now handled in createRoom/joinRoom or lazily
+  // To use specific ID for host, we need to create Peer with that ID.
 
   const broadcastState = useCallback((newState) => {
     setGameState(newState);
@@ -56,7 +49,7 @@ export function useGamePeer() {
   }, []);
 
   const handleAction = useCallback((action, fromPeerId) => {
-    if (!isHost && action.type !== 'JOIN') return;
+    if (!stateRef.current.roomId && action.type !== 'JOIN') return;
 
     setGameState(prevState => {
       let newState = _.cloneDeep(prevState);
@@ -197,24 +190,31 @@ export function useGamePeer() {
           break;
       }
 
-      broadcastState(newState);
+      if (isHost) broadcastState(newState);
       return newState;
     });
   }, [isHost, broadcastState]);
 
   const createRoom = useCallback((name) => {
-    if (!peer) return;
-    setIsHost(true);
-    const hostPlayer = { id: peer.id, name: name || 'Host', isHost: true, isReady: false, score: 0, eliminated: false };
-    const newState = {
-      ...INITIAL_STATE,
-      roomId: peer.id,
-      players: [hostPlayer]
-    };
-    setGameState(newState);
-    stateRef.current = newState;
+    const code = generateRoomCode();
+    const newPeer = new Peer(code);
 
-    peer.on('connection', (conn) => {
+    newPeer.on('open', (id) => {
+      setPeer(newPeer);
+      setIsHost(true);
+      currentPeerId.current = id;
+
+      const hostPlayer = { id, name: name || 'Host', isHost: true, isReady: false, score: 0, eliminated: false };
+      const newState = {
+        ...INITIAL_STATE,
+        roomId: id,
+        players: [hostPlayer]
+      };
+      setGameState(newState);
+      stateRef.current = newState;
+    });
+
+    newPeer.on('connection', (conn) => {
       conn.on('open', () => {
         connections.current[conn.peer] = conn;
         conn.on('data', (data) => {
@@ -227,42 +227,62 @@ export function useGamePeer() {
         delete connections.current[conn.peer];
       });
     });
-  }, [peer, handleAction]);
+
+    newPeer.on('error', (err) => {
+      if (err.type === 'unavailable-id') {
+        // Retry with new code if ID taken
+        createRoom(name);
+      } else {
+        console.error(err);
+        setError(err.message);
+      }
+    });
+  }, [handleAction]);
 
   const joinRoom = useCallback((roomId, name) => {
-    if (!peer) return;
-    setIsHost(false);
-    const conn = peer.connect(roomId);
+    const newPeer = new Peer();
 
-    conn.on('open', () => {
-      connections.current[roomId] = conn;
-      conn.send({ type: 'JOIN', name });
+    newPeer.on('open', (id) => {
+      setPeer(newPeer);
+      setIsHost(false);
+      currentPeerId.current = id;
 
-      conn.on('data', (data) => {
-        if (data.type === 'STATE_UPDATE') {
-          setGameState(data.state);
-        }
+      const conn = newPeer.connect(roomId);
+      conn.on('open', () => {
+        connections.current[roomId] = conn;
+        conn.send({ type: 'JOIN', name });
+
+        conn.on('data', (data) => {
+          if (data.type === 'STATE_UPDATE') {
+            setGameState(data.state);
+          }
+        });
+      });
+
+      conn.on('error', (err) => {
+        setError('Room not found or connection failed');
       });
     });
 
-    conn.on('error', (err) => {
-      setError('Failed to connect to room');
+    newPeer.on('error', (err) => {
+      console.error(err);
+      setError(err.message);
     });
-  }, [peer]);
+  }, []);
 
   const sendAction = useCallback((action) => {
     if (isHost) {
-      handleAction(action, peer.id);
+      handleAction(action, currentPeerId.current);
     } else {
       const hostConn = connections.current[gameState.roomId];
       if (hostConn && hostConn.open) {
         hostConn.send(action);
       }
     }
-  }, [isHost, handleAction, peer, gameState.roomId]);
+  }, [isHost, handleAction, gameState.roomId]);
 
   return {
-    peerId: peer?.id,
+    peerId: currentPeerId.current,
     gameState,
     isHost,
     error,
