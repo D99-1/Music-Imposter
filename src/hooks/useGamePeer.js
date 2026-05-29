@@ -12,7 +12,7 @@ const INITIAL_STATE = {
     maxRounds: 3,
     imposterCount: 1,
     customWords: [],
-    timeLimit: 60, // Default 60 seconds
+    timeLimit: 60,
   },
   currentWord: null,
   currentPlayingPlayerIndex: 0,
@@ -109,7 +109,6 @@ export function useGamePeer() {
           if (isHost && newState.status === 'SEARCH') {
             newState.timeLeft -= 1;
             if (newState.timeLeft <= 0) {
-              // Kick anyone not ready
               const notReadyIds = newState.players.filter(p => !p.eliminated && !p.isReady).map(p => p.id);
               newState.players = newState.players.filter(p => p.eliminated || p.isReady || p.isHost);
               notReadyIds.forEach(id => {
@@ -123,7 +122,6 @@ export function useGamePeer() {
 
               if (newState.players.filter(p => !p.eliminated).length < 3) {
                  newState.status = 'LOBBY';
-                 newState.roomId = prevState.roomId;
               } else {
                  newState.status = 'PLAYBACK';
                  newState.currentPlayingPlayerIndex = 0;
@@ -226,6 +224,10 @@ export function useGamePeer() {
             settings: prevState.settings
           };
           break;
+
+        case 'LEAVE':
+          // Handled at top level usually, but we can clear connections here
+          break;
       }
 
       if (isHost) broadcastState(newState);
@@ -233,7 +235,6 @@ export function useGamePeer() {
     });
   }, [isHost, broadcastState]);
 
-  // Host Timer Logic
   useEffect(() => {
     if (isHost && gameState.status === 'SEARCH') {
       timerRef.current = setInterval(() => {
@@ -322,6 +323,17 @@ export function useGamePeer() {
     });
   }, []);
 
+  const leaveRoom = useCallback(() => {
+    if (peer) {
+      peer.destroy();
+    }
+    setPeer(null);
+    setIsHost(false);
+    setGameState(INITIAL_STATE);
+    connections.current = {};
+    currentPeerId.current = null;
+  }, [peer]);
+
   const sendAction = useCallback((action) => {
     if (isHost) {
       handleAction(action, currentPeerId.current);
@@ -340,6 +352,7 @@ export function useGamePeer() {
     error,
     createRoom,
     joinRoom,
+    leaveRoom,
     sendAction,
   };
 }

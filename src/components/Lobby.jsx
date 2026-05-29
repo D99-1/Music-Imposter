@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Users, Settings, Play, Copy, Check, ShieldAlert, Clock, ListMusic, Plus, X, Trash2 } from 'lucide-react';
+import { Users, Settings, Play, Copy, Check, ShieldAlert, Clock, ListMusic, Plus, X, Trash2, LogOut, Hash } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, onKick }) {
+export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, onKick, onLeave }) {
   const [copied, setCopied] = useState(false);
   const [newWord, setNewWord] = useState('');
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const copyCode = () => {
     navigator.clipboard.writeText(gameState.roomId);
@@ -28,27 +30,43 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
 
   return (
     <div className="w-full max-w-5xl flex flex-col gap-6 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2 md:px-0">
+
+      {/* Header with Leave Button */}
+      <div className="flex justify-between items-center px-4 md:px-0">
+        <div className="space-y-1">
+           <h1 className="text-2xl font-black text-highlight tracking-tighter">LOBBY</h1>
+           <p className="text-[8px] font-black opacity-30 uppercase tracking-[0.3em]">Protocol Alpha-1</p>
+        </div>
+        <button
+          onClick={() => setShowLeaveConfirm(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-500 hover:text-white transition-all active:scale-95"
+        >
+          <LogOut size={14} /> LEAVE ROOM
+        </button>
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-6 md:gap-8 items-stretch">
 
         {/* Left Column: Players */}
         <div className="flex-1 bg-secondary/5 border border-secondary/10 rounded-[28px] md:rounded-[32px] p-6 md:p-8 space-y-6 md:space-y-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h2 className="text-2xl md:text-3xl font-black tracking-tighter flex items-center gap-3">
                 <Users className="text-highlight" size={24} md:size={28} /> ROSTER
               </h2>
               <p className="text-[10px] font-black opacity-30 uppercase tracking-widest">{gameState.players.length} Players Connected</p>
             </div>
+
             <button
               onClick={copyCode}
-              className="group relative flex flex-col items-center bg-secondary/10 hover:bg-secondary/20 px-6 py-3 rounded-2xl transition-all active:scale-95 border border-white/5"
+              className="w-full sm:w-auto group relative flex flex-col items-center bg-secondary/10 hover:bg-secondary/20 px-6 py-3 rounded-2xl transition-all active:scale-95 border border-white/5"
             >
               <span className="text-[8px] font-black opacity-30 uppercase tracking-widest mb-1">Room Code</span>
               <div className="flex items-center gap-3">
                 <span className="text-2xl font-black tracking-[0.2em] font-mono text-highlight">{gameState.roomId}</span>
                 {copied ? <Check size={16} className="text-accent" /> : <Copy size={16} className="opacity-30 group-hover:opacity-100 transition-opacity" />}
               </div>
-              {copied && <span className="absolute -top-8 bg-accent text-primary text-[8px] font-black px-2 py-1 rounded">COPIED</span>}
+              {copied && <span className="absolute -top-10 bg-accent text-primary text-[8px] font-black px-3 py-1.5 rounded-lg shadow-xl">COPIED</span>}
             </button>
           </div>
 
@@ -59,8 +77,8 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
                   {p.name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="font-bold block truncate text-sm md:text-base">{p.name}</span>
-                  {p.isHost && <span className="text-[8px] font-black text-highlight uppercase tracking-widest">Host</span>}
+                  <span className="font-bold block truncate text-sm md:text-base uppercase tracking-tight">{p.name}</span>
+                  {p.isHost && <span className="text-[8px] font-black text-highlight uppercase tracking-widest">Host / Commander</span>}
                 </div>
                 {isHost && !p.isHost && (
                   <button
@@ -78,14 +96,14 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
 
         {/* Right Column: Settings & Start */}
         <div className="w-full lg:w-80 flex flex-col gap-6">
-          <div className="bg-secondary/5 border border-secondary/10 rounded-[28px] md:rounded-[32px] p-6 md:p-8 space-y-6 md:space-y-8 flex-1">
-            <h2 className="text-xl font-black flex items-center gap-3 uppercase tracking-tight">
-              <Settings className="opacity-30" size={20} /> Rules
+          <div className="bg-secondary/5 border border-secondary/10 rounded-[28px] md:rounded-[32px] p-6 md:p-8 space-y-6 md:space-y-8 flex-1 text-center sm:text-left">
+            <h2 className="text-xl font-black flex items-center justify-center sm:justify-start gap-3 uppercase tracking-tight">
+              <Settings className="opacity-30" size={20} /> Parameters
             </h2>
 
             <div className="space-y-6">
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-[10px] font-black opacity-30 uppercase tracking-widest">
+                <div className="flex items-center justify-between text-[10px] font-black opacity-30 uppercase tracking-widest px-1">
                   <span className="flex items-center gap-1"><ShieldAlert size={12} /> Imposters</span>
                   <span>{gameState.settings.imposterCount}</span>
                 </div>
@@ -101,7 +119,26 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-[10px] font-black opacity-30 uppercase tracking-widest">
+                <div className="flex items-center justify-between text-[10px] font-black opacity-30 uppercase tracking-widest px-1">
+                  <span className="flex items-center gap-1"><Hash size={12} /> Rounds</span>
+                  <span>{gameState.settings.maxRounds}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[3, 5, 7].map(r => (
+                    <button
+                      key={r}
+                      disabled={!isHost}
+                      onClick={() => onUpdateSettings({ maxRounds: r })}
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${gameState.settings.maxRounds === r ? 'bg-highlight border-highlight text-white' : 'bg-transparent border-secondary/10 opacity-40'}`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-[10px] font-black opacity-30 uppercase tracking-widest px-1">
                   <span className="flex items-center gap-1"><Clock size={12} /> Time Limit</span>
                   <span>{gameState.settings.timeLimit}s</span>
                 </div>
@@ -121,7 +158,7 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
 
               {/* Custom Word List */}
               <div className="space-y-3">
-                 <div className="text-[10px] font-black opacity-30 uppercase tracking-widest flex items-center gap-1">
+                 <div className="text-[10px] font-black opacity-30 uppercase tracking-widest flex items-center justify-center sm:justify-start gap-1">
                    <ListMusic size={12} /> Custom Word List
                  </div>
                  {isHost && (
@@ -129,23 +166,23 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
                      <input
                        type="text"
                        value={newWord}
-                       onChange={(e) => setNewWord(e.target.value)}
-                       placeholder="Add word..."
-                       className="flex-1 bg-primary border border-secondary/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-highlight"
+                       onChange={(e) => setNewWord(e.target.value.toUpperCase())}
+                       placeholder="ADD WORD"
+                       className="flex-1 bg-primary border border-secondary/10 rounded-lg px-3 py-2 text-[10px] focus:outline-none focus:border-highlight uppercase font-bold"
                      />
                      <button type="submit" className="bg-secondary text-primary p-2 rounded-lg hover:bg-white transition-all">
                        <Plus size={14} />
                      </button>
                    </form>
                  )}
-                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar no-scrollbar">
+                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar no-scrollbar justify-center sm:justify-start">
                     {gameState.settings.customWords.map((word, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-secondary/10 rounded-md text-[10px] font-bold">
+                      <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-secondary/10 rounded-md text-[9px] font-black uppercase">
                         {word}
                         {isHost && <button onClick={() => removeWord(i)} className="hover:text-red-500 ml-1"><X size={10}/></button>}
                       </span>
                     ))}
-                    {gameState.settings.customWords.length === 0 && <span className="text-[10px] opacity-20 italic">Using default list</span>}
+                    {gameState.settings.customWords.length === 0 && <span className="text-[9px] opacity-20 italic">USING GLOBAL DATABASE</span>}
                  </div>
               </div>
             </div>
@@ -159,9 +196,9 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
             >
               <div className="flex flex-col items-center gap-1">
                 <div className="flex items-center gap-3">
-                  <Play fill="currentColor" size={24} md:size={28} /> START
+                  <Play fill="currentColor" size={24} md:size={28} /> START MISSION
                 </div>
-                {gameState.players.length < 3 && <p className="text-[10px] font-black opacity-60 uppercase tracking-tighter">Min. 3 Players Required</p>}
+                {gameState.players.length < 3 && <p className="text-[9px] font-black opacity-60 uppercase tracking-tighter">Insufficient Personnel (Min 3)</p>}
               </div>
             </button>
           ) : (
@@ -170,12 +207,52 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, on
                 <div className="flex justify-center gap-1">
                   {[0, 1, 2].map(i => <div key={i} className="w-1.5 h-1.5 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)}
                 </div>
-                <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em]">Waiting for host...</p>
+                <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em]">Waiting for Commander...</p>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Leave Confirmation Overlay */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-primary/80 backdrop-blur-md z-[100] flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-primary border border-secondary/10 p-8 rounded-[32px] max-w-sm w-full text-center space-y-6 shadow-2xl"
+            >
+               <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto">
+                  <LogOut size={32} />
+               </div>
+               <div className="space-y-2">
+                  <h3 className="text-2xl font-black tracking-tighter">ABANDON ROOM?</h3>
+                  <p className="text-sm opacity-50">Your current progress and connection will be terminated.</p>
+               </div>
+               <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setShowLeaveConfirm(false)}
+                    className="py-4 bg-secondary/5 border border-secondary/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-secondary/10 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={onLeave}
+                    className="py-4 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-500/20 hover:brightness-110 transition-all"
+                  >
+                    Abandon
+                  </button>
+               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

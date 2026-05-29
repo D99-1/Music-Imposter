@@ -7,7 +7,7 @@ import { Trophy, Home, RotateCcw, AlertTriangle, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
-  const { peerId, gameState, isHost, error, createRoom, joinRoom, sendAction } = useGamePeer();
+  const { peerId, gameState, isHost, error, createRoom, joinRoom, leaveRoom, sendAction } = useGamePeer();
 
   if (error) {
     return (
@@ -75,6 +75,7 @@ function App() {
                 onStart={() => sendAction({ type: 'START_GAME' })}
                 onUpdateSettings={(settings) => sendAction({ type: 'UPDATE_SETTINGS', settings })}
                 onKick={(targetId) => sendAction({ type: 'KICK_PLAYER', targetId })}
+                onLeave={leaveRoom}
               />
             </motion.div>
           )}
