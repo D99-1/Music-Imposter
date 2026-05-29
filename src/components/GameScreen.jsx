@@ -1,34 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { Music, AlertCircle, Play, ChevronRight, Vote, CheckCircle2, XCircle, Skull, Music2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Music, Play, ChevronRight, Vote, CheckCircle2, Skull, Music2, Timer } from 'lucide-react';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import SongSearch from './SongSearch';
 import AudioPreview from './AudioPreview';
 
 export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
   const me = gameState.players.find(p => p.id === peerId);
   const isEliminated = me?.eliminated;
+  const [isPlaying, setIsPlaying] = useState(false);
 
   if (gameState.status === 'REVEAL') {
+    const y = useMotionValue(0);
+    const opacity = useTransform(y, [-200, 0], [0, 1]);
+    const revealOpacity = useTransform(y, [-200, 0], [1, 0]);
+
     return (
-      <div className="flex flex-col items-center justify-center space-y-8 md:space-y-12 animate-in fade-in duration-1000 text-center max-w-lg w-full px-4">
+      <div className="flex flex-col items-center justify-center space-y-12 animate-in fade-in duration-1000 text-center max-w-lg w-full px-4 relative">
         <div className="space-y-4">
           <h2 className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em]">Identity Transmission</h2>
-          <div className={`text-6xl md:text-8xl font-black tracking-tighter leading-none ${me?.isImposter ? 'text-red-500' : 'text-accent'}`}>
-            {me?.isImposter ? 'IMPOSTER' : 'CREW'}
-          </div>
+          <p className="text-[10px] font-black text-highlight animate-pulse uppercase tracking-[0.2em]">Hold & Drag Card Up to Reveal</p>
         </div>
 
-        <div className="w-full bg-secondary/5 p-8 md:p-10 rounded-[32px] md:rounded-[40px] border border-secondary/10 relative overflow-hidden group">
-          <div className={`absolute top-0 left-0 w-full h-1 ${me?.isImposter ? 'bg-red-500' : 'bg-accent'} opacity-50`}></div>
-          {me?.isImposter
-            ? <div className="space-y-4">
-                <Skull className="mx-auto text-red-500/50" size={40} md:size={48} />
-                <p className="text-lg md:text-xl font-bold tracking-tight opacity-80 leading-snug">You don't know the word. Try to blend in with your frequency!</p>
+        <div className="w-full h-80 relative flex items-center justify-center">
+          {/* Hidden Content */}
+          <motion.div
+            style={{ opacity: revealOpacity }}
+            className="absolute inset-0 flex flex-col items-center justify-center space-y-4"
+          >
+             <div className={`text-6xl md:text-8xl font-black tracking-tighter leading-none ${me?.isImposter ? 'text-red-500' : 'text-accent'}`}>
+                {me?.isImposter ? 'IMPOSTER' : 'CREW'}
               </div>
-            : <div className="space-y-2">
-                <p className="text-[10px] opacity-30 uppercase font-black tracking-[0.2em] mb-4">Target Frequency</p>
-                <p className="text-4xl md:text-6xl font-black text-highlight tracking-tighter uppercase leading-none">{gameState.currentWord}</p>
-              </div>
-          }
+              {!me?.isImposter && (
+                <div className="space-y-1">
+                  <p className="text-[10px] opacity-30 uppercase font-black tracking-[0.2em]">Target Frequency</p>
+                  <p className="text-4xl md:text-5xl font-black text-highlight uppercase">{gameState.currentWord}</p>
+                </div>
+              )}
+              {me?.isImposter && <Skull className="text-red-500/50" size={64} />}
+          </motion.div>
+
+          {/* Draggable Card */}
+          <motion.div
+            drag="y"
+            dragConstraints={{ top: -300, bottom: 0 }}
+            style={{ y }}
+            onDragEnd={() => y.set(0)}
+            className="absolute inset-0 bg-secondary text-primary rounded-[40px] shadow-2xl flex flex-col items-center justify-center p-8 cursor-grab active:cursor-grabbing z-20"
+          >
+             <div className="w-12 h-1.5 bg-primary/20 rounded-full mb-8"></div>
+             <Music size={64} strokeWidth={2.5} />
+             <div className="mt-8 text-center">
+                <p className="font-black text-2xl tracking-tighter uppercase leading-tight">Secret<br/>Transmission</p>
+                <p className="text-[10px] font-bold opacity-30 mt-4 uppercase tracking-widest">Confidential</p>
+             </div>
+          </motion.div>
         </div>
 
         <div className="w-full">
@@ -68,7 +93,10 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
 
     return (
       <div className="flex flex-col items-center w-full space-y-8 md:space-y-12 animate-in slide-in-from-bottom-12 duration-700 px-4">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 w-full flex flex-col items-center">
+           <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-red-500/10 rounded-full text-red-500 font-black text-sm">
+              <Timer size={16} /> {gameState.timeLeft}s
+           </div>
            <h2 className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em] mb-2 md:mb-4">Transmission Phase</h2>
            {!me?.isImposter && <p className="text-highlight font-black text-4xl md:text-6xl tracking-tighter uppercase leading-none">{gameState.currentWord}</p>}
            {me?.isImposter && <p className="text-red-500 font-black text-4xl md:text-6xl tracking-tighter uppercase leading-none">Imposter</p>}
@@ -101,7 +129,11 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
 
             <div className="w-full">
               {isHost ? (
-                <AudioPreview song={currentPlayer.song} startTime={currentPlayer.song.startTime} isEditable={false} />
+                <AudioPreview
+                  song={currentPlayer.song}
+                  isPlaying={isPlaying}
+                  onTogglePlay={() => setIsPlaying(!isPlaying)}
+                />
               ) : (
                 <div className="p-6 md:p-8 bg-white/5 backdrop-blur-2xl rounded-[24px] md:rounded-[32px] border border-white/10 space-y-1">
                   <h4 className="font-black text-xl md:text-2xl tracking-tight leading-tight truncate">{currentPlayer?.song?.title}</h4>
@@ -115,7 +147,10 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
         <div className="w-full max-w-md fixed bottom-8 px-6 left-1/2 -translate-x-1/2 z-30 md:relative md:bottom-auto md:px-0">
           {isHost ? (
             <button
-              onClick={() => sendAction({ type: 'NEXT_SONG' })}
+              onClick={() => {
+                setIsPlaying(false);
+                sendAction({ type: 'NEXT_SONG' });
+              }}
               className="group w-full flex items-center justify-center gap-3 py-5 md:py-8 bg-secondary text-primary font-black rounded-2xl md:rounded-[32px] text-lg md:text-2xl shadow-2xl transform active:scale-95"
             >
               {gameState.currentPlayingPlayerIndex === playersWithSongs.length - 1 ? 'INITIATE VOTING' : 'NEXT SIGNAL'}

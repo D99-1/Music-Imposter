@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Users, Settings, Play, Copy, Check, ShieldAlert, Clock, ListMusic, Plus, X } from 'lucide-react';
+import { Users, Settings, Play, Copy, Check, ShieldAlert, Clock, ListMusic, Plus, X, Trash2 } from 'lucide-react';
 
-export default function Lobby({ gameState, isHost, onStart, onUpdateSettings }) {
+export default function Lobby({ gameState, isHost, onStart, onUpdateSettings, onKick }) {
   const [copied, setCopied] = useState(false);
   const [newWord, setNewWord] = useState('');
 
@@ -62,6 +62,15 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings }) 
                   <span className="font-bold block truncate text-sm md:text-base">{p.name}</span>
                   {p.isHost && <span className="text-[8px] font-black text-highlight uppercase tracking-widest">Host</span>}
                 </div>
+                {isHost && !p.isHost && (
+                  <button
+                    onClick={() => onKick(p.id)}
+                    className="p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                    title="Kick Player"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -93,18 +102,18 @@ export default function Lobby({ gameState, isHost, onStart, onUpdateSettings }) 
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-[10px] font-black opacity-30 uppercase tracking-widest">
-                  <span className="flex items-center gap-1"><Clock size={12} /> Rounds</span>
-                  <span>{gameState.settings.maxRounds}</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> Time Limit</span>
+                  <span>{gameState.settings.timeLimit}s</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {[3, 5, 7].map(r => (
+                  {[30, 60, 90].map(t => (
                     <button
-                      key={r}
+                      key={t}
                       disabled={!isHost}
-                      onClick={() => onUpdateSettings({ maxRounds: r })}
-                      className={`py-2 rounded-xl text-xs font-black border transition-all ${gameState.settings.maxRounds === r ? 'bg-highlight border-highlight text-white' : 'bg-transparent border-secondary/10 opacity-40'}`}
+                      onClick={() => onUpdateSettings({ timeLimit: t })}
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${gameState.settings.timeLimit === t ? 'bg-highlight border-highlight text-white' : 'bg-transparent border-secondary/10 opacity-40'}`}
                     >
-                      {r}
+                      {t}s
                     </button>
                   ))}
                 </div>

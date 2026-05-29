@@ -21,14 +21,14 @@ function App() {
              <AlertTriangle size={32} md:size={40} />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase">Connection Failed</h1>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase">Notice</h1>
             <p className="opacity-50 text-xs md:text-sm leading-relaxed">{error}</p>
           </div>
           <button
             onClick={() => window.location.reload()}
             className="w-full px-8 py-4 bg-secondary text-primary font-black rounded-2xl hover:bg-white transition-all active:scale-95 shadow-xl"
           >
-            RE-ESTABLISH LINK
+            DISMISS
           </button>
         </motion.div>
       </div>
@@ -74,6 +74,7 @@ function App() {
                 isHost={isHost}
                 onStart={() => sendAction({ type: 'START_GAME' })}
                 onUpdateSettings={(settings) => sendAction({ type: 'UPDATE_SETTINGS', settings })}
+                onKick={(targetId) => sendAction({ type: 'KICK_PLAYER', targetId })}
               />
             </motion.div>
           )}

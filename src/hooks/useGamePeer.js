@@ -12,11 +12,13 @@ const INITIAL_STATE = {
     maxRounds: 3,
     imposterCount: 1,
     customWords: [],
+    timeLimit: 60, // Default 60 seconds
   },
   currentWord: null,
   currentPlayingPlayerIndex: 0,
   winner: null,
   lastEliminated: null,
+  timeLeft: 0,
 };
 
 const generateRoomCode = () => {
@@ -31,13 +33,11 @@ export function useGamePeer() {
   const connections = useRef({});
   const stateRef = useRef(INITIAL_STATE);
   const currentPeerId = useRef(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     stateRef.current = gameState;
   }, [gameState]);
-
-  // Peer initialization is now handled in createRoom/joinRoom or lazily
-  // To use specific ID for host, we need to create Peer with that ID.
 
   const broadcastState = useCallback((newState) => {
     setGameState(newState);
@@ -49,8 +49,6 @@ export function useGamePeer() {
   }, []);
 
   const handleAction = useCallback((action, fromPeerId) => {
-    if (!stateRef.current.roomId && action.type !== 'JOIN') return;
-
     setGameState(prevState => {
       let newState = _.cloneDeep(prevState);
 
@@ -65,6 +63,18 @@ export function useGamePeer() {
               score: 0,
               eliminated: false,
             });
+          }
+          break;
+
+        case 'KICK_PLAYER':
+          if (isHost) {
+            newState.players = newState.players.filter(p => p.id !== action.targetId);
+            const conn = connections.current[action.targetId];
+            if (conn) {
+              conn.send({ type: 'KICKED' });
+              conn.close();
+              delete connections.current[action.targetId];
+            }
           }
           break;
 
@@ -92,6 +102,34 @@ export function useGamePeer() {
         case 'START_SEARCH':
           newState.status = 'SEARCH';
           newState.players.forEach(p => p.isReady = false);
+          newState.timeLeft = newState.settings.timeLimit;
+          break;
+
+        case 'TICK':
+          if (isHost && newState.status === 'SEARCH') {
+            newState.timeLeft -= 1;
+            if (newState.timeLeft <= 0) {
+              // Kick anyone not ready
+              const notReadyIds = newState.players.filter(p => !p.eliminated && !p.isReady).map(p => p.id);
+              newState.players = newState.players.filter(p => p.eliminated || p.isReady || p.isHost);
+              notReadyIds.forEach(id => {
+                const conn = connections.current[id];
+                if (conn) {
+                  conn.send({ type: 'KICKED', reason: 'Time exceeded' });
+                  conn.close();
+                  delete connections.current[id];
+                }
+              });
+
+              if (newState.players.filter(p => !p.eliminated).length < 3) {
+                 newState.status = 'LOBBY';
+                 newState.roomId = prevState.roomId;
+              } else {
+                 newState.status = 'PLAYBACK';
+                 newState.currentPlayingPlayerIndex = 0;
+              }
+            }
+          }
           break;
 
         case 'SUBMIT_SONG':
@@ -195,6 +233,18 @@ export function useGamePeer() {
     });
   }, [isHost, broadcastState]);
 
+  // Host Timer Logic
+  useEffect(() => {
+    if (isHost && gameState.status === 'SEARCH') {
+      timerRef.current = setInterval(() => {
+        handleAction({ type: 'TICK' }, currentPeerId.current);
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isHost, gameState.status, handleAction]);
+
   const createRoom = useCallback((name) => {
     const code = generateRoomCode();
     const newPeer = new Peer(code);
@@ -230,7 +280,6 @@ export function useGamePeer() {
 
     newPeer.on('error', (err) => {
       if (err.type === 'unavailable-id') {
-        // Retry with new code if ID taken
         createRoom(name);
       } else {
         console.error(err);
@@ -255,6 +304,9 @@ export function useGamePeer() {
         conn.on('data', (data) => {
           if (data.type === 'STATE_UPDATE') {
             setGameState(data.state);
+          } else if (data.type === 'KICKED') {
+            setError(data.reason || 'You were kicked from the room');
+            setGameState(INITIAL_STATE);
           }
         });
       });
