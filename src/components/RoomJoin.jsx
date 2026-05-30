@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
 import { Plus, LogIn, Music, User } from 'lucide-react';
+import { useState } from 'react';
 
 export default function RoomJoin({ onCreate, onJoin }) {
   const [name, setName] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
 
   const handleJoin = (e) => {
     e.preventDefault();

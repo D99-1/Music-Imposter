@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Music, Play, ChevronRight, Vote, CheckCircle2, Skull, Music2, Timer } from 'lucide-react';
+import { useState } from 'react';
+import { Music, ChevronRight, Vote, CheckCircle2, Skull, Music2, Timer } from 'lucide-react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import SongSearch from './SongSearch';
 import AudioPreview from './AudioPreview';
@@ -9,16 +9,14 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
   const isEliminated = me?.eliminated;
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Framer Motion hooks MUST be at the top level
   const dragY = useMotionValue(0);
   const revealOpacity = useTransform(dragY, [-150, 0], [1, 0]);
 
-  // Return early if 'me' is not found yet (prevent blank screen on transition)
   if (!me && gameState.status !== 'PLAYBACK' && gameState.status !== 'RESULTS') {
      return (
        <div className="flex flex-col items-center justify-center space-y-4 animate-pulse">
          <div className="w-12 h-12 border-4 border-highlight border-t-transparent rounded-full animate-spin"></div>
-         <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.3em]">Synchronizing Identity...</p>
+         <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em]">Syncing Identity...</p>
        </div>
      );
   }
@@ -32,7 +30,6 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
         </div>
 
         <div className="w-full h-80 relative flex items-center justify-center">
-          {/* Hidden Content */}
           <motion.div
             style={{ opacity: revealOpacity }}
             className="absolute inset-0 flex flex-col items-center justify-center space-y-4"
@@ -49,7 +46,6 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
               {me?.isImposter && <Skull className="text-red-500/50" size={64} />}
           </motion.div>
 
-          {/* Draggable Card */}
           <motion.div
             drag="y"
             dragConstraints={{ top: -300, bottom: 0 }}
@@ -75,11 +71,11 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
               COMMENCE SEARCH
             </button>
           ) : (
-            <div className="space-y-3">
+            <div className="flex flex-col items-center gap-3">
               <div className="flex justify-center gap-1">
-                {[0, 1, 2].map(i => <div key={i} className="w-1.5 h-1.5 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>) }
+                {[0, 1, 2].map(i => <div key={i} className="w-2 h-2 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)}
               </div>
-              <p className="text-[10px] font-black opacity-20 uppercase tracking-[0.4em]">Waiting for Host Authorization</p>
+              <p className="text-[10px] font-black opacity-20 uppercase tracking-[0.4em]">Awaiting Authorization</p>
             </div>
           )}
         </div>

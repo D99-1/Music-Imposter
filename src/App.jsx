@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
 import { useGamePeer } from './hooks/useGamePeer';
 import RoomJoin from './components/RoomJoin';
 import Lobby from './components/Lobby';
 import GameScreen from './components/GameScreen';
-import { Trophy, Home, RotateCcw, AlertTriangle, Music } from 'lucide-react';
+import { Trophy, Home, RotateCcw, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
