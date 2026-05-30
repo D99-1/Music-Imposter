@@ -265,7 +265,11 @@ export function useGamePeer() {
       conn.on('open', () => {
         connections.current[conn.peer] = conn;
         conn.on('data', (data) => {
-          handleAction(data, conn.peer);
+          if (data.type === 'STATE_UPDATE') {
+             // Host usually doesn't receive state updates, but logic safety
+          } else {
+             handleAction(data, conn.peer);
+          }
         });
         conn.send({ type: 'STATE_UPDATE', state: stateRef.current });
       });

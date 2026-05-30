@@ -9,6 +9,10 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
   const isEliminated = me?.eliminated;
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Framer Motion hooks MUST be at the top level
+  const dragY = useMotionValue(0);
+  const revealOpacity = useTransform(dragY, [-150, 0], [1, 0]);
+
   // Return early if 'me' is not found yet (prevent blank screen on transition)
   if (!me && gameState.status !== 'PLAYBACK' && gameState.status !== 'RESULTS') {
      return (
@@ -20,9 +24,6 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
   }
 
   if (gameState.status === 'REVEAL') {
-    const y = useMotionValue(0);
-    const revealOpacity = useTransform(y, [-150, 0], [1, 0]);
-
     return (
       <div className="flex flex-col items-center justify-center space-y-12 animate-in fade-in duration-1000 text-center max-w-lg w-full px-4 relative">
         <div className="space-y-4">
@@ -52,8 +53,8 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
           <motion.div
             drag="y"
             dragConstraints={{ top: -300, bottom: 0 }}
-            style={{ y }}
-            onDragEnd={() => y.set(0)}
+            style={{ y: dragY }}
+            onDragEnd={() => dragY.set(0)}
             className="absolute inset-0 bg-secondary text-primary rounded-[40px] shadow-2xl flex flex-col items-center justify-center p-8 cursor-grab active:cursor-grabbing z-20"
           >
              <div className="w-12 h-1.5 bg-primary/20 rounded-full mb-8"></div>
