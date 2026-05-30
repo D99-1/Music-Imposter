@@ -31,28 +31,52 @@ export function useGamePeer() {
   const [isHost, setIsHost] = useState(false);
   const [error, setError] = useState(null);
   const [activePeerId, setActivePeerId] = useState(null);
+
   const connections = useRef({});
-  const stateRef = useRef(INITIAL_STATE);
   const timerRef = useRef(null);
 
-  useEffect(() => {
-    stateRef.current = gameState;
-  }, [gameState]);
+  const stateRef = useRef(gameState);
+  const isHostRef = useRef(isHost);
+  const activePeerIdRef = useRef(activePeerId);
 
-  const broadcastState = useCallback((newState) => {
-    setGameState(newState);
+  useEffect(() => { stateRef.current = gameState; }, [gameState]);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+  useEffect(() => { activePeerIdRef.current = activePeerId; }, [activePeerId]);
+
+  const broadcastState = useCallback((state) => {
+    if (!isHostRef.current) return;
     Object.values(connections.current).forEach(conn => {
       if (conn.open) {
-        conn.send({ type: 'STATE_UPDATE', state: newState });
+        conn.send({ type: 'STATE_UPDATE', state });
       }
     });
   }, []);
 
   const handleAction = useCallback((action, fromPeerId) => {
+    const currentIsHost = isHostRef.current;
+    const currentState = stateRef.current;
+
+    console.log('[GamePeer] Action:', action.type, 'from:', fromPeerId, 'isHost:', currentIsHost);
+
+    if (!currentIsHost && !['STATE_UPDATE', 'KICKED'].includes(action.type)) {
+      const hostConn = connections.current[currentState.roomId];
+      if (hostConn && hostConn.open) {
+        hostConn.send(action);
+      }
+      return;
+    }
+
     setGameState(prevState => {
       let newState = _.cloneDeep(prevState);
 
       switch (action.type) {
+        case 'STATE_UPDATE':
+          return action.state;
+
+        case 'KICKED':
+          setError(action.reason || 'You were kicked from the room');
+          return INITIAL_STATE;
+
         case 'JOIN':
           if (!newState.players.find(p => p.id === fromPeerId)) {
             newState.players.push({
@@ -67,7 +91,7 @@ export function useGamePeer() {
           break;
 
         case 'KICK_PLAYER':
-          if (isHost) {
+          if (currentIsHost) {
             newState.players = newState.players.filter(p => p.id !== action.targetId);
             const conn = connections.current[action.targetId];
             if (conn) {
@@ -82,13 +106,14 @@ export function useGamePeer() {
           newState.settings = { ...newState.settings, ...action.settings };
           break;
 
-        case 'START_GAME':
+        case 'START_GAME': {
           newState.status = 'REVEAL';
           newState.round = 1;
           newState.currentWord = getRandomWord(newState.settings.customWords);
-          const activePlayers = newState.players.filter(p => !p.eliminated);
-          const shuffled = _.shuffle(activePlayers);
-          const imposterIds = shuffled.slice(0, Math.min(newState.settings.imposterCount, activePlayers.length - 1)).map(p => p.id);
+          const eligiblePlayers = newState.players.filter(p => !p.eliminated);
+          const shuffled = _.shuffle(eligiblePlayers);
+          const imposterCount = Math.max(1, Math.min(newState.settings.imposterCount, eligiblePlayers.length - 1));
+          const imposterIds = shuffled.slice(0, imposterCount).map(p => p.id);
           newState.players = newState.players.map(p => ({
             ...p,
             isImposter: imposterIds.includes(p.id),
@@ -98,29 +123,20 @@ export function useGamePeer() {
             eliminated: false,
           }));
           break;
+        }
 
         case 'START_SEARCH':
           newState.status = 'SEARCH';
-          newState.players.forEach(p => p.isReady = false);
+          newState.players.forEach(p => { p.isReady = false; });
           newState.timeLeft = newState.settings.timeLimit;
           break;
 
         case 'TICK':
-          if (isHost && newState.status === 'SEARCH') {
+          if (currentIsHost && newState.status === 'SEARCH') {
             newState.timeLeft -= 1;
             if (newState.timeLeft <= 0) {
-              const notReadyIds = newState.players.filter(p => !p.eliminated && !p.isReady).map(p => p.id);
-              newState.players = newState.players.filter(p => p.eliminated || p.isReady || p.isHost);
-              notReadyIds.forEach(id => {
-                const conn = connections.current[id];
-                if (conn) {
-                  conn.send({ type: 'KICKED', reason: 'Time exceeded' });
-                  conn.close();
-                  delete connections.current[id];
-                }
-              });
-
-              if (newState.players.filter(p => !p.eliminated).length < 3) {
+              const readyPlayers = newState.players.filter(p => !p.eliminated && p.isReady);
+              if (readyPlayers.length < 3) {
                  newState.status = 'LOBBY';
               } else {
                  newState.status = 'PLAYBACK';
@@ -130,29 +146,32 @@ export function useGamePeer() {
           }
           break;
 
-        case 'SUBMIT_SONG':
+        case 'SUBMIT_SONG': {
           const player = newState.players.find(p => p.id === fromPeerId);
           if (player) {
             player.song = action.song;
             player.isReady = true;
           }
-          if (newState.players.filter(p => !p.eliminated).every(p => p.isReady)) {
+          const activeOnes = newState.players.filter(p => !p.eliminated);
+          if (activeOnes.every(p => p.isReady)) {
             newState.status = 'PLAYBACK';
             newState.currentPlayingPlayerIndex = 0;
-            newState.players.forEach(p => p.isReady = false);
+            newState.players.forEach(p => { p.isReady = false; });
           }
           break;
+        }
 
-        case 'NEXT_SONG':
+        case 'NEXT_SONG': {
           newState.currentPlayingPlayerIndex += 1;
-          const remainingPlayers = newState.players.filter(p => !p.eliminated);
-          if (newState.currentPlayingPlayerIndex >= remainingPlayers.length) {
+          const playersWithSongs = newState.players.filter(p => !p.eliminated && p.song);
+          if (newState.currentPlayingPlayerIndex >= playersWithSongs.length) {
             newState.status = 'VOTING';
-            newState.players.forEach(p => p.isReady = false);
+            newState.players.forEach(p => { p.isReady = false; });
           }
           break;
+        }
 
-        case 'VOTE':
+        case 'VOTE': {
           const voter = newState.players.find(p => p.id === fromPeerId);
           if (voter && !voter.eliminated) {
             voter.votedFor = action.targetId;
@@ -164,7 +183,6 @@ export function useGamePeer() {
             const votes = _.countBy(votingPlayers, 'votedFor');
             const maxVotes = _.max(Object.values(votes)) || 0;
             const mostVotedIds = Object.keys(votes).filter(id => votes[id] === maxVotes);
-
             const eliminatedId = mostVotedIds[0];
             const eliminatedPlayer = newState.players.find(p => p.id === eliminatedId);
 
@@ -189,6 +207,7 @@ export function useGamePeer() {
             }
           }
           break;
+        }
 
         case 'NEXT_ROUND':
           if (newState.status === 'RESULTS') {
@@ -225,108 +244,83 @@ export function useGamePeer() {
           };
           break;
       }
-
-      if (isHost) broadcastState(newState);
       return newState;
     });
-  }, [isHost, broadcastState]);
+  }, []);
+
+  useEffect(() => {
+    if (isHost && gameState.roomId) {
+      broadcastState(gameState);
+    }
+  }, [gameState, isHost, broadcastState]);
 
   useEffect(() => {
     if (isHost && gameState.status === 'SEARCH') {
       timerRef.current = setInterval(() => {
-        handleAction({ type: 'TICK' }, activePeerId);
+        handleAction({ type: 'TICK' }, activePeerIdRef.current);
       }, 1000);
     } else {
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     }
-    return () => clearInterval(timerRef.current);
-  }, [isHost, gameState.status, handleAction, activePeerId]);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isHost, gameState.status, handleAction]);
 
-  const createRoom = useCallback((name) => {
+  const createRoom = useCallback(function createRoomInternal(name) {
     const code = generateRoomCode();
-    const newPeer = new Peer(code);
-
+    const newPeer = new Peer(code, { debug: 1 });
     newPeer.on('open', (id) => {
       setPeer(newPeer);
       setIsHost(true);
       setActivePeerId(id);
-
-      const hostPlayer = { id, name: name || 'Host', isHost: true, isReady: false, score: 0, eliminated: false };
-      const newState = {
+      setGameState({
         ...INITIAL_STATE,
         roomId: id,
-        players: [hostPlayer]
-      };
-      setGameState(newState);
-      stateRef.current = newState;
+        players: [{ id, name: name || 'Host', isHost: true, isReady: false, score: 0, eliminated: false }]
+      });
     });
-
     newPeer.on('connection', (conn) => {
       conn.on('open', () => {
         connections.current[conn.peer] = conn;
-        conn.on('data', (data) => {
-          if (data.type === 'STATE_UPDATE') {
-             // Host usually doesn't receive state updates, but logic safety
-          } else {
-             handleAction(data, conn.peer);
-          }
-        });
+        conn.on('data', (data) => handleAction(data, conn.peer));
         conn.send({ type: 'STATE_UPDATE', state: stateRef.current });
       });
-
       conn.on('close', () => {
         delete connections.current[conn.peer];
+        setGameState(prev => ({
+          ...prev,
+          players: prev.players.filter(p => p.id !== conn.peer)
+        }));
       });
     });
-
     newPeer.on('error', (err) => {
-      if (err.type === 'unavailable-id') {
-        createRoom(name);
-      } else {
-        console.error(err);
-        setError(err.message);
-      }
+      if (err.type === 'unavailable-id') createRoomInternal(name);
+      else setError(err.message);
     });
   }, [handleAction]);
 
   const joinRoom = useCallback((roomId, name) => {
-    const newPeer = new Peer();
-
+    const newPeer = new Peer(null, { debug: 1 });
     newPeer.on('open', (id) => {
       setPeer(newPeer);
       setIsHost(false);
       setActivePeerId(id);
-
-      const conn = newPeer.connect(roomId);
+      const conn = newPeer.connect(roomId, { reliable: true });
       conn.on('open', () => {
         connections.current[roomId] = conn;
         conn.send({ type: 'JOIN', name });
-
-        conn.on('data', (data) => {
-          if (data.type === 'STATE_UPDATE') {
-            setGameState(data.state);
-          } else if (data.type === 'KICKED') {
-            setError(data.reason || 'You were kicked from the room');
-            setGameState(INITIAL_STATE);
-          }
-        });
+        conn.on('data', (data) => handleAction(data, roomId));
       });
-
-      conn.on('error', (err) => {
-        setError('Room not found or connection failed');
+      conn.on('close', () => {
+        setError('Connection to host lost');
+        setGameState(INITIAL_STATE);
       });
+      conn.on('error', () => setError('Room not found or connection failed'));
     });
-
-    newPeer.on('error', (err) => {
-      console.error(err);
-      setError(err.message);
-    });
-  }, []);
+    newPeer.on('error', (err) => setError(err.message));
+  }, [handleAction]);
 
   const leaveRoom = useCallback(() => {
-    if (peer) {
-      peer.destroy();
-    }
+    if (peer) peer.destroy();
     setPeer(null);
     setIsHost(false);
     setGameState(INITIAL_STATE);
@@ -335,24 +329,8 @@ export function useGamePeer() {
   }, [peer]);
 
   const sendAction = useCallback((action) => {
-    if (isHost) {
-      handleAction(action, activePeerId);
-    } else {
-      const hostConn = connections.current[gameState.roomId];
-      if (hostConn && hostConn.open) {
-        hostConn.send(action);
-      }
-    }
-  }, [isHost, handleAction, gameState.roomId, activePeerId]);
+    handleAction(action, activePeerIdRef.current);
+  }, [handleAction]);
 
-  return {
-    peerId: activePeerId,
-    gameState,
-    isHost,
-    error,
-    createRoom,
-    joinRoom,
-    leaveRoom,
-    sendAction,
-  };
+  return { peerId: activePeerId, gameState, isHost, error, createRoom, joinRoom, leaveRoom, sendAction };
 }

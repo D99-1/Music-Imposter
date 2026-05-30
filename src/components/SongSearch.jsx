@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Search, Music, X, Play, Pause } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Search, Music, Play, Pause } from 'lucide-react';
 import { searchSongs } from '../services/itunes';
 
 export default function SongSearch({ onSelect }) {
@@ -10,22 +10,28 @@ export default function SongSearch({ onSelect }) {
   const audioRef = useRef(new Audio());
 
   const handleSearch = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!query) return;
     setLoading(true);
-    const songs = await searchSongs(query);
-    setResults(songs);
-    setLoading(false);
+    try {
+      const songs = await searchSongs(query);
+      setResults(songs);
+    } catch (err) {
+      console.error("Search failed", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const togglePreview = (e, song) => {
+    e.preventDefault();
     e.stopPropagation();
     if (playingId === song.id) {
       audioRef.current.pause();
       setPlayingId(null);
     } else {
       audioRef.current.src = song.previewUrl;
-      audioRef.current.play();
+      audioRef.current.play().catch(err => console.error("Audio play failed", err));
       setPlayingId(song.id);
       audioRef.current.onended = () => setPlayingId(null);
     }
@@ -56,11 +62,19 @@ export default function SongSearch({ onSelect }) {
           {results.map(song => (
             <div
               key={song.id}
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 audioRef.current.pause();
                 onSelect(song);
               }}
-              className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-secondary/5 hover:bg-secondary/10 rounded-2xl border border-transparent hover:border-highlight/30 transition-all text-left group cursor-pointer"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  audioRef.current.pause();
+                  onSelect(song);
+                }
+              }}
+              className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-secondary/5 hover:bg-secondary/10 rounded-2xl border border-transparent hover:border-highlight/30 transition-all text-left group cursor-pointer active:scale-[0.98] select-none"
             >
               <div className="relative overflow-hidden rounded-xl w-12 h-12 md:w-14 md:h-14 flex-shrink-0">
                  <img src={song.artwork} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
@@ -70,8 +84,9 @@ export default function SongSearch({ onSelect }) {
                 <div className="text-[9px] md:text-[10px] font-black opacity-30 uppercase tracking-widest truncate">{song.artist}</div>
               </div>
               <button
+                type="button"
                 onClick={(e) => togglePreview(e, song)}
-                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-highlight"
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-highlight z-10"
               >
                 {playingId === song.id ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
               </button>
