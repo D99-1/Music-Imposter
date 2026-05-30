@@ -9,10 +9,19 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
   const isEliminated = me?.eliminated;
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Return early if 'me' is not found yet (prevent blank screen on transition)
+  if (!me && gameState.status !== 'PLAYBACK' && gameState.status !== 'RESULTS') {
+     return (
+       <div className="flex flex-col items-center justify-center space-y-4 animate-pulse">
+         <div className="w-12 h-12 border-4 border-highlight border-t-transparent rounded-full animate-spin"></div>
+         <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.3em]">Synchronizing Identity...</p>
+       </div>
+     );
+  }
+
   if (gameState.status === 'REVEAL') {
     const y = useMotionValue(0);
-    const opacity = useTransform(y, [-200, 0], [0, 1]);
-    const revealOpacity = useTransform(y, [-200, 0], [1, 0]);
+    const revealOpacity = useTransform(y, [-150, 0], [1, 0]);
 
     return (
       <div className="flex flex-col items-center justify-center space-y-12 animate-in fade-in duration-1000 text-center max-w-lg w-full px-4 relative">
@@ -67,7 +76,7 @@ export default function GameScreen({ gameState, peerId, isHost, sendAction }) {
           ) : (
             <div className="space-y-3">
               <div className="flex justify-center gap-1">
-                {[0, 1, 2].map(i => <div key={i} className="w-1.5 h-1.5 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)}
+                {[0, 1, 2].map(i => <div key={i} className="w-1.5 h-1.5 bg-highlight rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>) }
               </div>
               <p className="text-[10px] font-black opacity-20 uppercase tracking-[0.4em]">Waiting for Host Authorization</p>
             </div>

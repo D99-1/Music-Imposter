@@ -30,9 +30,9 @@ export function useGamePeer() {
   const [gameState, setGameState] = useState(INITIAL_STATE);
   const [isHost, setIsHost] = useState(false);
   const [error, setError] = useState(null);
+  const [activePeerId, setActivePeerId] = useState(null);
   const connections = useRef({});
   const stateRef = useRef(INITIAL_STATE);
-  const currentPeerId = useRef(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -224,10 +224,6 @@ export function useGamePeer() {
             settings: prevState.settings
           };
           break;
-
-        case 'LEAVE':
-          // Handled at top level usually, but we can clear connections here
-          break;
       }
 
       if (isHost) broadcastState(newState);
@@ -238,13 +234,13 @@ export function useGamePeer() {
   useEffect(() => {
     if (isHost && gameState.status === 'SEARCH') {
       timerRef.current = setInterval(() => {
-        handleAction({ type: 'TICK' }, currentPeerId.current);
+        handleAction({ type: 'TICK' }, activePeerId);
       }, 1000);
     } else {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [isHost, gameState.status, handleAction]);
+  }, [isHost, gameState.status, handleAction, activePeerId]);
 
   const createRoom = useCallback((name) => {
     const code = generateRoomCode();
@@ -253,7 +249,7 @@ export function useGamePeer() {
     newPeer.on('open', (id) => {
       setPeer(newPeer);
       setIsHost(true);
-      currentPeerId.current = id;
+      setActivePeerId(id);
 
       const hostPlayer = { id, name: name || 'Host', isHost: true, isReady: false, score: 0, eliminated: false };
       const newState = {
@@ -295,7 +291,7 @@ export function useGamePeer() {
     newPeer.on('open', (id) => {
       setPeer(newPeer);
       setIsHost(false);
-      currentPeerId.current = id;
+      setActivePeerId(id);
 
       const conn = newPeer.connect(roomId);
       conn.on('open', () => {
@@ -331,22 +327,22 @@ export function useGamePeer() {
     setIsHost(false);
     setGameState(INITIAL_STATE);
     connections.current = {};
-    currentPeerId.current = null;
+    setActivePeerId(null);
   }, [peer]);
 
   const sendAction = useCallback((action) => {
     if (isHost) {
-      handleAction(action, currentPeerId.current);
+      handleAction(action, activePeerId);
     } else {
       const hostConn = connections.current[gameState.roomId];
       if (hostConn && hostConn.open) {
         hostConn.send(action);
       }
     }
-  }, [isHost, handleAction, gameState.roomId]);
+  }, [isHost, handleAction, gameState.roomId, activePeerId]);
 
   return {
-    peerId: currentPeerId.current,
+    peerId: activePeerId,
     gameState,
     isHost,
     error,
